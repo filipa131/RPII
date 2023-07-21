@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Bridges</title>
+  <script src="https://rp2.studenti.math.hr/~zbujanov/dz3/puzzle.js"></script>
+  <style>
+
+    table {
+      border-collapse: collapse;
+    }
+    td {
+      border: 1px solid black;
+      width: 30px;
+      height: 30px;
+      text-align: center;
+    }
+    .table-container {
+      float: left;
+      margin-right: 20px;
+      margin-top: 20px;
+    }
+
+    .bridge-type-container {
+      float: left;
+      margin-top: 20px;
+    }
+
+  </style>
+</head>
+<body>
+  <h1>Bridges</h1>
+  
+  <label for="gameSelect">Level:</label>
+  <select id="gameSelect">
+  </select>
+  
+  <button onclick="startGame()">Start game!</button>
+  
+  <div id="gameContainer"></div>
+
+  <div id="winMessage"></div>
+  
+  <script>
+    // Funkcija za generiranje opcija padajućeg izbornika
+    function generateGameOptions() {
+      var selectElement = document.getElementById("gameSelect");
+      selectElement.innerHTML = ""; 
+      
+      for (var i = 0; i < puzzle.length; i++) {
+        var option = document.createElement("option");
+        option.value = i; 
+        option.text = puzzle[i].name; 
+        selectElement.appendChild(option);
+      }
+    }
+    
+    // Funkcija koja se poziva prilikom klika na gumb "Start game!"
+    function startGame() {
+      var selectElement = document.getElementById("gameSelect");
+      var selectedGameIndex = selectElement.value; 
+      var game = puzzle[selectedGameIndex]; 
+      var gameTable = document.createElement("table");
+      
+      // Inicijaliziram dvodimenzionalni niz za praćenje brojeva u tablici
+      var numbers = [];
+      for (var i = 0; i < game.size; i++) {
+        numbers[i] = [];
+      }
+      
+      // Postavljam brojeve iz niza island_num na odgovarajuće pozicije u retku i stupcu
+      for (var i = 0; i < game.island_num.length; i++) {
+        var row = game.island_row[i] - 1; 
+        var col = game.island_col[i] - 1; 
+        
+        numbers[row][col] = game.island_num[i];
+      }
+      
+      // Generiram HTML tablicu s brojevima
+      for (var row = 0; row < game.size; row++) {
+        var tr = document.createElement("tr");
+        
+        for (var col = 0; col < game.size; col++) {
+          var td = document.createElement("td");
+          
+          if (typeof numbers[row][col] !== "undefined") {
+            td.textContent = numbers[row][col]; 
+          } else {
+            td.textContent = ""; 
+          }
+          td.addEventListener("click", onTableCellClick);
+          tr.appendChild(td);
+        }
+        
+        gameTable.appendChild(tr);
+      }
+      
+      var gameContainer = document.getElementById("gameContainer");
+      gameContainer.innerHTML = ""; 
+
+      // Kreiram kontejner za tablicu i dodajem ga u gameContainer
+      var tableContainer = document.createElement("div");
+      tableContainer.classList.add("table-container");
+      tableContainer.appendChild(gameTable);
+      gameContainer.appendChild(tableContainer);
+      
+      // Kreiram kontejner za odabir vrste mosta i dodajem ga u gameContainer
+      var bridgeTypeContainer = document.createElement("div");
+      bridgeTypeContainer.classList.add("bridge-type-container");
+      
+      // Dodajem "Type of bridge:" tekst
+      var bridgeTypeLabel = document.createElement("label");
+      bridgeTypeLabel.textContent = "Type of bridge:";
+      bridgeTypeContainer.appendChild(bridgeTypeLabel);
+      var lineBreak = document.createElement("br");
+      bridgeTypeContainer.appendChild(lineBreak);
+      
+      // Dodajem radio gumbe za odabir vrste mosta
+      var bridgeTypes = ["-", "=", "|", "||"];
+      for (var i = 0; i < bridgeTypes.length; i++) {
+        var bridgeTypeInput = document.createElement("input");
+        bridgeTypeInput.type = "radio";
+        bridgeTypeInput.name = "bridgeType";
+        bridgeTypeInput.value = bridgeTypes[i];
+        bridgeTypeContainer.appendChild(bridgeTypeInput);
+        
+        var bridgeTypeLabel = document.createElement("label");
+        bridgeTypeLabel.textContent = bridgeTypes[i];
+        bridgeTypeContainer.appendChild(bridgeTypeLabel);
+        
+        var lineBreak = document.createElement("br");
+        bridgeTypeContainer.appendChild(lineBreak);
+      }
+      
+      gameContainer.appendChild(bridgeTypeContainer);
+
+      // Varijabla za pohranu trenutno odabranog tipa mosta
+      var selectedBridgeType = null;
+
+      // Funkcija koja se poziva prilikom promjene odabranog tipa mosta
+      function onBridgeTypeChange(event) {
+        selectedBridgeType = event.target.value;
+      }
+
+      // Registriramo slušatelja događaja promjene odabranog tipa mosta
+      var bridgeTypeInputs = document.getElementsByName("bridgeType");
+      for (var i = 0; i < bridgeTypeInputs.length; i++) {
+        bridgeTypeInputs[i].addEventListener("change", onBridgeTypeChange);
+      }
+
+      // Postavljanje mostova
+      function checkVerticalIslands(cell, bridgeType) {
+        var colIndex = cell.cellIndex;
+        var aboveCell = cell.parentNode.previousElementSibling;
+        var islandsAbove = false;
+
+        while (aboveCell) {
+          if (aboveCell.cells[colIndex].textContent !== "") {
+            if (aboveCell.cells[colIndex].textContent === "-" || aboveCell.cells[colIndex].textContent === "=") {
+              break;
+            }
+            islandsAbove = true;
+            break;
+          }
+          aboveCell = aboveCell.previousElementSibling;
+        }
+
+        var belowCell = cell.parentNode.nextElementSibling;
+        var islandsBelow = false;
+
+        while (belowCell) {
+          if (belowCell.cells[colIndex].textContent !== "") {
+            if (belowCell.cells[colIndex].textContent === "-" || belowCell.cells[colIndex].textContent === "=") {
+              break;
+            }
+            islandsBelow = true;
+            break;
+          }
+          belowCell = belowCell.nextElementSibling;
+        }
+
+        if (islandsAbove && islandsBelow) {
+          var start = aboveCell.rowIndex + 1;
+          var end = belowCell.rowIndex - 1;
+
+          for (var i = start; i <= end; i++) {
+            cell.parentNode.parentNode.rows[i].cells[colIndex].textContent = bridgeType;
+          }
+        }
+      }
+
+      function checkHorizontalIslands(cell, bridgeType) {
+
+        var leftCell = cell.previousElementSibling;
+        var islandLeft = false;
+
+        while (leftCell) {
+          if (leftCell.textContent !== "") {
+            if (leftCell.textContent === "|" || leftCell.textContent === "||") {
+              break;
+            }
+            islandLeft = true;
+            break;
+          }
+          leftCell = leftCell.previousElementSibling;
+        }
+
+        var rightCell = cell.nextElementSibling;
+        var islandRight = false;
+
+        while (rightCell) {
+          if (rightCell.textContent !== "") {
+            if (rightCell.textContent === "|" || rightCell.textContent === "||") {
+              break;
+            }
+            islandRight = true;
+            break;
+          }
+          rightCell = rightCell.nextElementSibling;
+        }
+
+        if (islandLeft && islandRight) {
+          var start = leftCell.cellIndex + 1;
+          var end = rightCell.cellIndex - 1;
+
+          for (var i = start; i <= end; i++) {
+            cell.parentNode.cells[i].textContent = bridgeType;
+          }
+        }
+      }
+
+      // Brisanje mostova
+      function removeVerticalBridges(cell) {
+        var colIndex = cell.cellIndex;
+
+        if (cell.textContent === "|" || cell.textContent === "||") {
+          cell.textContent = "";
+        }
+
+        var aboveCell = cell.parentNode.previousElementSibling;
+
+        while (aboveCell) {
+          if (aboveCell.cells[colIndex].textContent === "|" || aboveCell.cells[colIndex].textContent === "||") {
+            aboveCell.cells[colIndex].textContent = "";          
+          }
+          else break;
+          aboveCell = aboveCell.previousElementSibling;
+        }
+
+        var belowCell = cell.parentNode.nextElementSibling;
+
+        while (belowCell) {
+          if (belowCell.cells[colIndex].textContent === "|" || belowCell.cells[colIndex].textContent === "||") {
+            belowCell.cells[colIndex].textContent = ""
+          }
+          else break;
+          belowCell = belowCell.nextElementSibling;
+        }
+      }
+
+      function removeHorizontalBridges(cell) {
+        if (cell.textContent === "-" || cell.textContent === "=") {
+          cell.textContent = "";
+        }
+        var leftCell = cell.previousElementSibling;
+
+        while (leftCell) {
+          if (leftCell.textContent === "-" || leftCell.textContent === "=") {
+            leftCell.textContent = "";          
+          }
+          else break;
+          leftCell = leftCell.previousElementSibling;
+        }
+
+        var rightCell = cell.nextElementSibling;
+
+        while (rightCell) {
+          if (rightCell.textContent === "-" || rightCell.textContent === "=") {
+            rightCell.textContent = "";
+          }
+          else break;
+          rightCell = rightCell.nextElementSibling;
+        }
+      }
+
+      // Dodavanje mostova lijevim klikom
+      function onTableCellClick(event) {
+        if (selectedBridgeType !== null) {
+          var cell = event.target;
+
+          if (cell.tagName === "TD" && cell.textContent === "") {
+            var row = cell.parentNode.rowIndex;
+            var col = cell.cellIndex;
+
+            if (selectedBridgeType === "|") {
+              checkVerticalIslands(cell, "|");
+            } else if (selectedBridgeType === "||") {
+              checkVerticalIslands(cell, "||");
+            } else if (selectedBridgeType === "-") {
+              checkHorizontalIslands(cell, "-");
+            } else if (selectedBridgeType === "=") {
+              checkHorizontalIslands(cell, "=");
+            }
+
+            checkIslands();
+          }
+        }
+      }
+
+      // Brisanje mostova desnim klikom
+      gameTable.addEventListener("mousedown", function(event) {
+        if (event.button === 2) { // Provjeravam je li desni klik miša
+          var cell = event.target;
+          if (cell.tagName === "TD" && cell.textContent !== "") {
+
+            if (cell.textContent === "|" || cell.textContent === "||") {
+              removeVerticalBridges(cell);
+            } else if (cell.textContent === "-" || cell.textContent === "=") {
+              removeHorizontalBridges(cell);
+            }
+
+            checkIslands();
+          }
+        }
+      });
+
+      function checkIslands() {
+        var islands = gameContainer.querySelectorAll("td:not(:empty)"); // Dohvaćam sva polja s brojevima (otoke)
+
+        islands.forEach(function (island) {
+          var row = island.parentNode.rowIndex;
+          var col = island.cellIndex;
+          var islandNum = parseInt(island.textContent);
+
+          var sum = 0;
+
+          // Provjeravam mostove iznad i ispod otoka
+          var aboveCell = row > 0 ? gameTable.rows[row - 1].cells[col] : null;
+          var belowCell = row < game.size - 1 ? gameTable.rows[row + 1].cells[col] : null;
+
+          if (aboveCell && aboveCell.textContent === "|") {
+            sum++;
+          }
+          if (aboveCell && aboveCell.textContent === "||") {
+            sum += 2;
+          }
+          if (belowCell && belowCell.textContent === "|") {
+            sum++;
+          }
+          if (belowCell && belowCell.textContent === "||") {
+            sum += 2;
+          }
+
+          // Provjeravam mostove s lijeve i desne strane otoka
+          var leftCell = col > 0 ? island.previousElementSibling : null;
+          var rightCell = col < game.size - 1 ? island.nextElementSibling : null;
+
+          if (leftCell && leftCell.textContent === "-") {
+            sum++;
+          }
+          if (leftCell && leftCell.textContent === "=") {
+            sum += 2;
+          }
+          if (rightCell && rightCell.textContent === "-") {
+            sum++;
+          }
+          if (rightCell && rightCell.textContent === "=") {
+            sum += 2;
+          }
+          
+          // Označavanje otoka zelenom bojom ako je suma mostova jednaka broju otoka
+          if (sum === islandNum) {
+            island.style.backgroundColor = "green";
+          }
+          else {
+            island.style.backgroundColor = "white";
+          }
+        });
+      }
+
+      
+      // Registriram slušatelja događaja klika na polje u tablici
+      gameTable.addEventListener("click", onTableCellClick);
+
+      // Dodajem onemogućavanje kontekstnog izbornika desnim klikom na polje u tablici
+      gameTable.addEventListener("contextmenu", function(event) {
+        event.preventDefault(); 
+      });
+
+    }
+    
+    // Pozivam funkciju za generiranje opcija padajućeg izbornika prilikom učitavanja stranice
+    generateGameOptions();
+  </script>
+</body>
+</html>
+
+

@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Exchange Rate List</title>
+  <style>
+    canvas {
+        border: 1px solid #ccc;
+    }
+    body {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+    }
+    #chart-container {
+        display: flex;
+        align-items: flex-start;
+    }
+    #checkbox-container {
+        margin-left: 20px; 
+    }
+    .dot {
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        position: absolute;
+    }
+    .label-aud {
+        color: #FF0000;
+    }
+    .label-usd {
+        color: #00FF00;
+    }
+    .label-gbp {
+        color: #0000FF;
+    }
+    .label-chf {
+        color: #FF00FF;
+    }
+    .label-cad {
+        color: #00FFFF;
+    }
+    #nextMonth {
+        position: relative;
+        top: 0;
+        right: 0;
+        margin-top: 10px;
+        margin-left: 505px; 
+    }
+    #balloon {
+        position: absolute;
+        display: none;
+        padding: 4px;
+        background-color: rgba(0, 0, 0, 0.7);
+        color: #fff;
+        font-size: 12px;
+        white-space: nowrap;
+        pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+  <h1>Exchange Rate List</h1>
+
+  <div id="chart-container">
+    <canvas id="chart" width="700" height="400"></canvas>
+    <div id="checkbox-container">
+      <div id="average-values"></div>
+      <br><br>
+      <label for="aud" class="label-aud">AUD</label>
+      <input type="checkbox" id="aud" checked>
+      <br><br>
+      <label for="usd" class="label-usd">USD</label>
+      <input type="checkbox" id="usd" checked>
+      <br><br>
+      <label for="gbp" class="label-gbp">GBP</label>
+      <input type="checkbox" id="gbp" checked>
+      <br><br>
+      <label for="chf" class="label-chf">CHF</label>
+      <input type="checkbox" id="chf" checked>
+      <br><br>
+      <label for="cad" class="label-cad">CAD</label>
+      <input type="checkbox" id="cad" checked>
+    </div>
+  </div>  
+
+  <div>
+    <button id="previousMonth">Previous Month</button>
+    <button id="nextMonth">Next Month</button>
+  </div>
+
+  <div id="balloon" unchecked></div>
+
+  <script>
+    const canvas = document.getElementById('chart');
+    const ctx = canvas.getContext('2d');
+    const previousMonthButton = document.getElementById('previousMonth');
+    const nextMonthButton = document.getElementById('nextMonth');
+    const audCheckbox = document.getElementById('aud');
+    const usdCheckbox = document.getElementById('usd');
+    const gbpCheckbox = document.getElementById('gbp');
+    const chfCheckbox = document.getElementById('chf');
+    const cadCheckbox = document.getElementById('cad');
+    const baseCurrency = 'EUR';
+    const selectedCurrencies = ['AUD', 'USD', 'GBP', 'CHF', 'CAD'];
+
+    const currencyColors = {
+        AUD: '#FF0000',  
+        USD: '#00FF00',  
+        GBP: '#0000FF',  
+        CHF: '#FF00FF',  
+        CAD: '#00FFFF',  
+    };
+
+    let currentDate = new Date(2023, 4, 1); 
+    let ratesData = null;
+
+    async function fetchRatesForMonth(month, year) {
+        const startDate = new Date(year, month, 1);
+        const endDate = new Date(year, month + 1, 0);
+        const symbols = selectedCurrencies.join(',');
+        const rates = {};
+
+        for (let date = startDate; date <= endDate; date.setDate(date.getDate() + 1)) {
+            const formattedDate = date.toISOString().split('T')[0];
+            const response = await fetch(`https://api.exchangerate.host/${formattedDate}?base=${baseCurrency}&symbols=${symbols}`);
+            const data = await response.json();
+            rates[formattedDate] = data.rates;
+        }
+        console.log(rates);
+
+        return rates;
+    }
+
+    const yAxisMargin = 0;
+    const xAxisMargin = 0;
+    const chartWidth = canvas.width - xAxisMargin;
+    const chartHeight = canvas.height - yAxisMargin;
+
+    function drawChart() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        const allRates = Object.values(ratesData).map(dateRates => Object.values(dateRates));
+        const ratesFlat = allRates.flat();
+        const minRate = Math.min(...ratesFlat);
+        const maxRate = Math.max(...ratesFlat);
+
+        ctx.beginPath();
+        ctx.moveTo(xAxisMargin, 0);
+        ctx.lineTo(xAxisMargin, chartHeight);
+        ctx.lineTo(canvas.width, chartHeight);
+        ctx.stroke();
+
+        const currencyLineColor = {};
+
+        Object.keys(ratesData).forEach((date, index) => {
+            const x = xAxisMargin + (index * (chartWidth / (Object.keys(ratesData).length - 1)));
+
+            selectedCurrencies.forEach((currency, currencyIndex) => {
+            const ratesForDate = ratesData[date];
+            const rate = ratesForDate && ratesForDate[currency];
+
+            if (rate !== undefined) {
+                const y = chartHeight - ((rate - minRate) / (maxRate - minRate) * chartHeight);
+
+                const adjustedY = Math.max(y, yAxisMargin);
+                const adjustedHeight = Math.min(chartHeight - adjustedY, chartHeight - yAxisMargin);
+
+                ctx.fillStyle = currencyColors[currency];
+                ctx.beginPath();
+                ctx.arc(x, adjustedY, 2, 0, 2 * Math.PI);
+                ctx.fill();
+
+                currencyLineColor[currency] = currencyColors[currency];
+
+                if (index > 0) {
+                    const previousX = xAxisMargin + ((index - 1) * (chartWidth / (Object.keys(ratesData).length - 1)));
+                    const previousRatesForDate = ratesData[Object.keys(ratesData)[index - 1]];
+                    const previousRate = previousRatesForDate && previousRatesForDate[currency];
+
+                    if (previousRate !== undefined) {
+                        const previousY = chartHeight - ((previousRate - minRate) / (maxRate - minRate) * chartHeight);
+
+                        ctx.strokeStyle = currencyLineColor[currency];
+                        ctx.beginPath();
+                        ctx.moveTo(previousX, previousY);
+                        ctx.lineTo(x, adjustedY);
+                        ctx.stroke();
+                    }
+                }
+            }
+            });
+        });
+    }
+
+    function calculateAverageValues() {
+        const averageValuesContainer = document.getElementById('average-values');
+        averageValuesContainer.innerHTML = '';
+
+        selectedCurrencies.forEach((currency) => {
+            const values = [];
+            Object.entries(ratesData).forEach(([date, dateRates]) => {
+                const rate = dateRates[currency];
+                if (rate !== undefined) {
+                    values.push(rate);
+                }
+            });
+
+            const sum = values.reduce((acc, val) => acc + val, 0);
+            const average = sum / values.length;
+            const roundedAverage = average.toFixed(2);
+
+            const currencyAverageElement = document.createElement('div');
+            currencyAverageElement.textContent = `${currency}: ${roundedAverage}`;
+            averageValuesContainer.appendChild(currencyAverageElement);
+        });
+
+        const formattedMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(currentDate);
+        const formattedYear = currentDate.getFullYear();
+        const averageTitleElement = document.createElement('h4');
+        averageTitleElement.textContent = `Average value for ${formattedMonth} ${formattedYear}:`;
+        averageValuesContainer.prepend(averageTitleElement);
+    }
+
+    let currentMouseX = 0;
+
+    function showCurrencyValues(event, minRate, maxRate) {
+        const mouseX = event.clientX - canvas.getBoundingClientRect().left;
+        const chartWidth = canvas.width - xAxisMargin;
+        const index = Math.round(((mouseX - xAxisMargin) / chartWidth) * (Object.keys(ratesData).length - 1));
+
+        if (index >= 0 && index < Object.keys(ratesData).length) {
+            const date = Object.keys(ratesData)[index];
+            const ratesForDate = ratesData[date];
+
+            const selectedRates = Object.entries(ratesForDate).filter(([currency]) => {
+                return selectedCurrencies.includes(currency);
+            });
+
+            if (selectedRates.length > 0) {
+                const balloon = document.getElementById('balloon');
+                let balloonContent = '';
+
+                selectedRates.forEach(([currency, rate]) => {
+                    const y = chartHeight - ((rate - minRate) / (maxRate - minRate) * chartHeight);
+                    const currencyValue = rate.toFixed(2);
+
+                    balloonContent += `${currency}: ${currencyValue}\n`;
+                });
+
+                if (balloonContent !== '') {
+                    balloon.style.display = 'block';
+                    balloon.style.left = `${event.clientX}px`;
+                    balloon.style.top = `${chartHeight}px`;
+                    balloon.textContent = balloonContent.trim();
+                } else {
+                    balloon.style.display = 'none';
+                }
+            }
+        }
+    }
+
+    function hideCurrencyValues() {
+        const balloon = document.getElementById('balloon');
+        balloon.style.display = 'none';
+    }  
+
+    async function updateChart() {
+        ratesData = await fetchRatesForMonth(currentDate.getMonth(), currentDate.getFullYear());
+        drawChart();
+        calculateAverageValues();
+    }
+
+    updateChart();
+
+    function updateChartOnCurrencyChange() {
+        selectedCurrencies.length = 0;
+
+        if (audCheckbox.checked) {
+        selectedCurrencies.push('AUD');
+        }
+
+        if (usdCheckbox.checked) {
+        selectedCurrencies.push('USD');
+        }
+
+        if (gbpCheckbox.checked) {
+        selectedCurrencies.push('GBP');
+        }
+
+        if (chfCheckbox.checked) {
+        selectedCurrencies.push('CHF');
+        }
+
+        if (cadCheckbox.checked) {
+        selectedCurrencies.push('CAD');
+        }
+
+        updateChart();
+        calculateAverageValues();
+    }
+
+    canvas.addEventListener('mousemove', (event) => {
+        currentMouseX = event.clientX;
+        const allRates = Object.values(ratesData).map(dateRates => Object.values(dateRates));
+        const ratesFlat = allRates.flat();
+        const minRate = Math.min(...ratesFlat);
+        const maxRate = Math.max(...ratesFlat);
+        showCurrencyValues(event, minRate, maxRate); 
+    });
+
+    canvas.addEventListener('mouseleave', () => {
+        hideCurrencyValues();
+    });
+
+    previousMonthButton.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() - 1);
+        updateChart();
+    });
+
+    nextMonthButton.addEventListener('click', () => {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+        updateChart();
+    });
+
+    window.addEventListener('load', () => {
+        ctx.fillStyle = "#FFFFFF"; 
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        audCheckbox.checked = true;
+        usdCheckbox.checked = true;
+        gbpCheckbox.checked = true;
+        chfCheckbox.checked = true;
+        cadCheckbox.checked = true;
+    });
+
+    audCheckbox.addEventListener('change', updateChartOnCurrencyChange);
+    usdCheckbox.addEventListener('change', updateChartOnCurrencyChange);
+    gbpCheckbox.addEventListener('change', updateChartOnCurrencyChange);
+    chfCheckbox.addEventListener('change', updateChartOnCurrencyChange);
+    cadCheckbox.addEventListener('change', updateChartOnCurrencyChange);
+  </script>
+</body>
+</html>
